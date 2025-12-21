@@ -6,7 +6,7 @@ class PGTOConfig:
     """Configuration for PGTO optimization."""
 
     # Parallel restarts
-    num_restarts: int = 5
+    num_restarts: int = 1
 
     # Per-step optimization
     K: int = 2048  # Number of candidate trajectories per restart
