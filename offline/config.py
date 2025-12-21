@@ -14,12 +14,14 @@ class PGTOConfig:
     noise_window: int = 2  # Steps within horizon to inject noise
     noise_std: float = 0.1  # Noise standard deviation
     temperature: float = 2.0  # Temperature to combine candidate trajectories
+    w_action_smooth = 50_000.0  # Action smoothing
 
     # Evaluation (match eval.py/tinyphysics.py)
     w_tracking: float = 5000.0
     w_jerk: float = 100.0
     context_length: int = 20
     control_start_idx: int = 100
+    cost_steps: int = 400  # Only evaluate first 400 steps
 
     # Physics (match tinyphysics.py)
     physics_temperature: float = 0.8

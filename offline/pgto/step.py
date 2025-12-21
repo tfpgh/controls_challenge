@@ -34,6 +34,7 @@ class PGTOStep:
         history_states: torch.Tensor,  # [R, 20, 4]
         history_tokens: torch.Tensor,  # [R, 20]
         prev_lataccel: torch.Tensor,  # [R]
+        prev_action: torch.Tensor,  # [R]
         cmaes_state: CMAESState,  # Batch size R
         future_context: FutureContext,  # {targets, roll, v_ego, a_ego} each [H]
     ) -> torch.Tensor:
@@ -52,12 +53,14 @@ class PGTOStep:
 
         """
         R, K = self.config.num_restarts, self.config.K
+        assert K % 2 == 0, "K must be even for antithetic sampling"
         RK = R * K
 
         # Expand states from R to R*K (each restart has K candidates)
         states_expanded = history_states.repeat_interleave(K, dim=0)  # [R*K, 20, 4]
         tokens_expanded = history_tokens.repeat_interleave(K, dim=0)  # [R*K, 20]
         prev_lat_expanded = prev_lataccel.repeat_interleave(K)  # [R*K]
+        prev_action_expanded = prev_action.repeat_interleave(K)  # [R*K]
         cmaes_expanded = cmaes_state.expand(RK)
 
         # Antithetic noise: generate half, mirror within each restart
@@ -73,6 +76,7 @@ class PGTOStep:
             history_states=states_expanded,
             history_tokens=tokens_expanded,
             prev_lataccel=prev_lat_expanded,
+            prev_action=prev_action_expanded,
             cmaes_state=cmaes_expanded,
             future_context=future_context,
             noise=noise,

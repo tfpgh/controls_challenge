@@ -195,6 +195,8 @@ class PGTOOptimizer:
         all_cmaes_state = torch.zeros(R, T, 4, device=device)
         all_actions = torch.zeros(R, T, device=device)
 
+        prev_action = torch.zeros(R, device=device)
+
         # Accumulators
         total_tracking = torch.zeros(R, device=device)
         total_jerk = torch.zeros(R, device=device)
@@ -232,6 +234,7 @@ class PGTOOptimizer:
                 history_states=history_states,
                 history_tokens=history_tokens,
                 prev_lataccel=prev_lataccel,
+                prev_action=prev_action,
                 cmaes_state=cmaes_state,
                 future_context=future_context,
             )
@@ -257,10 +260,11 @@ class PGTOOptimizer:
             )
 
             # Accumulate cost
-            tracking_error = new_lataccel - segment.targets[t]
-            jerk = (new_lataccel - prev_lataccel) / 0.1
-            total_tracking += tracking_error**2
-            total_jerk += jerk**2
+            if t < self.config.cost_steps:
+                tracking_error = new_lataccel - segment.targets[t]
+                jerk = (new_lataccel - prev_lataccel) / 0.1
+                total_tracking += tracking_error**2
+                total_jerk += jerk**2
 
             # Update CMA-ES state
             error_t = target_t - prev_lataccel
@@ -275,10 +279,11 @@ class PGTOOptimizer:
             )
 
             prev_lataccel = new_lataccel
+            prev_action = best_actions
 
-        costs = self.config.w_tracking * (total_tracking / T) + self.config.w_jerk * (
-            total_jerk / T
-        )
+        costs = self.config.w_tracking * (
+            total_tracking / self.config.cost_steps
+        ) + self.config.w_jerk * (total_jerk / self.config.cost_steps)
 
         # Build into TrajectoryData
         trajectories = []

@@ -27,6 +27,7 @@ class ParallelRollout:
         history_states: torch.Tensor,  # [R*K, 20, 4]
         history_tokens: torch.Tensor,  # [R*K, 20]
         prev_lataccel: torch.Tensor,  # [R*K]
+        prev_action: torch.Tensor,  # [R*K]
         cmaes_state: CMAESState,  # Batch size R*K
         future_context: FutureContext,  # {targets, roll, v_ego, a_ego} each [H]
         noise: torch.Tensor,  # [R*K, noise_window]
@@ -60,6 +61,7 @@ class ParallelRollout:
         total_tracking = torch.zeros(RK, device=self.config.device)
         total_jerk = torch.zeros(RK, device=self.config.device)
         first_actions = None
+        action_smoothness = None
 
         for h in range(H):
             target_h = future_context.targets[h]
@@ -95,8 +97,10 @@ class ParallelRollout:
 
             actions = actions.clamp(self.config.steer_min, self.config.steer_max)
 
-            if first_actions is None:
+            if first_actions is None or action_smoothness is None:
                 first_actions = actions.clone()
+                # Penalize deviation from previous action
+                action_smoothness = (actions - prev_action) ** 2
 
             # Update state history
             new_state = torch.stack(
@@ -131,11 +135,13 @@ class ParallelRollout:
 
             prev_lat = pred_lat
 
-        # Total costs
-        costs = self.config.w_tracking * (total_tracking / H) + self.config.w_jerk * (
-            total_jerk / H
-        )
+        assert first_actions is not None and action_smoothness is not None
 
-        assert first_actions is not None
+        # Total costs
+        costs = (
+            self.config.w_tracking * (total_tracking / H)
+            + self.config.w_jerk * (total_jerk / H)
+            + self.config.w_action_smooth * action_smoothness
+        )
 
         return costs, first_actions
