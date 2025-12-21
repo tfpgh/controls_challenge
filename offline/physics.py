@@ -67,7 +67,7 @@ class BatchedPhysics(nn.Module):
             lataccel: [B] - sampled and clamped lataccel
         """
         logits = self.forward(states, tokens)
-        probs = F.softmax(logits / self.config.temperature, dim=-1)
+        probs = F.softmax(logits / self.config.physics_temperature, dim=-1)
 
         # Sample from distribution
         indices = torch.multinomial(probs, num_samples=1).squeeze(-1)
@@ -102,7 +102,7 @@ class BatchedPhysics(nn.Module):
             lataccel: [B] - expected value, clamped
         """
         logits = self.forward(states, tokens)
-        probs = F.softmax(logits / self.config.temperature, dim=-1)
+        probs = F.softmax(logits / self.config.physics_temperature, dim=-1)
         lataccel = (probs * self.bins).sum(dim=-1)
 
         # Clamp
