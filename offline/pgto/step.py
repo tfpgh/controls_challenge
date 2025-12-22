@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 
 from offline.cmaes import CMAESModel, CMAESState
 from offline.config import PGTOConfig
@@ -86,9 +85,7 @@ class PGTOStep:
         costs = costs.view(R, K)
         first_actions = first_actions.view(R, K)
 
-        # Importance weight based on temperature
-        weights = F.softmax(-costs / self.config.temperature, dim=1)  # [R, K]
-
-        best_actions = (weights * first_actions).sum(dim=1)  # [R]
+        best_idx = costs.argmin(dim=1)
+        best_actions = first_actions.gather(1, best_idx.unsqueeze(1)).squeeze(1)
 
         return best_actions

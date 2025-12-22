@@ -11,9 +11,8 @@ class PGTOConfig:
     # Per-step optimization
     K: int = 2048  # Number of candidate trajectories per restart
     horizon: int = 10  # Lookahead horizon
-    noise_window: int = 1  # Steps within horizon to inject noise
-    noise_std: float = 0.15  # Noise standard deviation
-    temperature: float = 1.0  # Temperature to combine candidate trajectories
+    noise_window: int = 2  # Steps within horizon to inject noise
+    noise_std: float = 0.05  # Noise standard deviation
     w_action_smooth: float = 6.0  # Action smoothing
 
     # Evaluation (match eval.py/tinyphysics.py)

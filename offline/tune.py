@@ -15,7 +15,6 @@ def objective(trial: optuna.Trial) -> float:
         "horizon": trial.suggest_int("horizon", 6, 12),
         "noise_window": trial.suggest_int("noise_window", 1, 3),
         "noise_std": trial.suggest_float("noise_std", 0.01, 0.3, log=True),
-        "temperature": trial.suggest_float("temperature", 0.001, 0.2, log=True),
         "w_action_smooth": trial.suggest_float("w_action_smooth", 4.0, 8.0),
     }
 
@@ -29,7 +28,6 @@ def objective(trial: optuna.Trial) -> float:
             horizon=params["horizon"],
             noise_window=params["noise_window"],
             noise_std=params["noise_std"],
-            temperature=params["temperature"],
             w_action_smooth=params["w_action_smooth"],
         )
 
