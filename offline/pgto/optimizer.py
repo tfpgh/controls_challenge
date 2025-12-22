@@ -207,39 +207,9 @@ class PGTOOptimizer:
         if verbose:
             iterator = tqdm(iterator, desc="PGTO", leave=False)
 
-        # DEBUG
-        print(f"Initial history_states[0, -1]: {history_states[0, -1]}")
-        print(f"Initial prev_lataccel: {prev_lataccel[0].item():.4f}")
-        print(f"Initial prev_action: {prev_action[0].item():.4f}")
-
         for t in iterator:
             target_t = segment.targets[t]
             future_context = segment.get_future_context(t, self.config.horizon)
-
-            # DEBUG
-            cmaes_features = self.cmaes.compute_features(
-                target=target_t.unsqueeze(0),
-                current_lataccel=prev_lataccel[0:1],
-                state=CMAESState(
-                    prev_error=cmaes_state.prev_error[0:1],
-                    error_integral=cmaes_state.error_integral[0:1],
-                    u_t1=cmaes_state.u_t1[0:1],
-                    u_t2=cmaes_state.u_t2[0:1],
-                ),
-                v_ego=segment.v_ego[t].unsqueeze(0),
-                a_ego=segment.a_ego[t].unsqueeze(0),
-                roll=segment.roll[t].unsqueeze(0),
-                future_targets=future_context.targets,
-            )
-            cmaes_action = self.cmaes(cmaes_features).item()
-
-            print(f"\n=== t={t} ===")
-            print(f"target: {target_t.item():.4f}")
-            print(f"prev_lataccel: {prev_lataccel[0].item():.4f}")
-            print(f"prev_action: {prev_action[0].item():.4f}")
-            print(f"error_integral: {cmaes_state.error_integral[0].item():.4f}")
-            print(f"future_context.targets[:3]: {future_context.targets[:3].tolist()}")
-            print(f"CMA-ES would output: {cmaes_action:.4f}")
 
             # Record current state BEFORE taking action
             all_history_states[:, t] = history_states
@@ -256,11 +226,6 @@ class PGTOOptimizer:
                 cmaes_state.error_integral + error_t, -5.0, 5.0
             )
 
-            # DEBUG
-            print(
-                f"  After update: error_integral = {cmaes_state.error_integral[0].item():.4f}"
-            )
-
             # Step PGTO, find best action for each restart
             # Deterministic physics inside
             # Lots of comments on physics because it's hard to keep track of 😂
@@ -271,13 +236,6 @@ class PGTOOptimizer:
                 prev_action=prev_action,
                 cmaes_state=cmaes_state,
                 future_context=future_context,
-            )
-
-            # DEBUG
-            print(f"PGTO chose: {best_actions[0].item():.4f}")
-            print(f"Diff from CMA-ES: {abs(best_actions[0].item() - cmaes_action):.4f}")
-            print(
-                f"  After PGTO: error_integral = {cmaes_state.error_integral[0].item():.4f}"
             )
 
             all_actions[:, t] = best_actions
