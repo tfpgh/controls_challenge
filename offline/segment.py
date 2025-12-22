@@ -43,9 +43,11 @@ class Segment:
         """
 
         def pad_to_horizon(tensor: torch.Tensor) -> torch.Tensor:
-            future = tensor[t : t + horizon]
-            if len(future) < horizon:
-                pad_len = horizon - len(future)
+            # We need horizon + 1 steps for the cost calculation (t+1 to t+H+1)
+            req_len = horizon + 1
+            future = tensor[t : t + req_len]
+            if len(future) < req_len:
+                pad_len = req_len - len(future)
                 future = torch.cat([future, future[-1:].expand(pad_len)])
 
             return future

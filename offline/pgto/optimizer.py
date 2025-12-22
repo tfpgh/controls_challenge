@@ -186,7 +186,30 @@ class PGTOOptimizer:
         )
         prev_lataccel = torch.full((R,), segment.initial_lataccel, device=device)
 
-        cmaes_state = CMAESState.zeros(R, device)
+        init_u_t1 = segment.initial_history_states[-1, 0].expand(R)
+        init_u_t2 = segment.initial_history_states[-2, 0].expand(R)
+
+        warmup_lats = segment.initial_history_lataccel
+        warmup_integral = torch.zeros(R, device=device)
+
+        w_prev = warmup_lats[0]
+        for i in range(1, len(warmup_lats)):
+            w_curr = warmup_lats[i]
+            w_error = w_curr - w_prev
+            warmup_integral = torch.clamp(warmup_integral + w_error, -5.0, 5.0)
+            w_prev = w_curr
+
+        final_error = segment.targets[0] - warmup_lats[-1]
+        warmup_integral = torch.clamp(warmup_integral + final_error, -5.0, 5.0)
+
+        cmaes_state = CMAESState(
+            prev_error=torch.zeros(
+                R, device=device
+            ),  # Reset prev_error at start of control
+            error_integral=warmup_integral,
+            u_t1=init_u_t1,
+            u_t2=init_u_t2,
+        )
 
         # Storage for trajectories
         all_history_states = torch.zeros(R, T, 20, 4, device=device)

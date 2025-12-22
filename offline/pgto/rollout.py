@@ -66,6 +66,8 @@ class ParallelRollout:
 
         for h in range(H):
             target_h = future_context.targets[h]
+            target_next = future_context.targets[h + 1]
+
             roll_h = future_context.roll[h]
             v_ego_h = future_context.v_ego[h]
             a_ego_h = future_context.a_ego[h]
@@ -119,8 +121,8 @@ class ParallelRollout:
             # Deterministic physics step
             pred_lat = self.physics.expectation(states, tokens, prev_lat)
 
-            # Costs
-            tracking_error = pred_lat - target_h
+            # Costs (Compare pred at t+h+1 with target at t+h+1)
+            tracking_error = pred_lat - target_next
             jerk = (pred_lat - prev_lat) / 0.1
 
             total_tracking += tracking_error**2
