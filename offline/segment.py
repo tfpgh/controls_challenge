@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -76,8 +77,11 @@ def load_segment(segment_path: Path, config: PGTOConfig) -> Segment:
     )
 
     # Vehicle states
+    roll_rad = df["roll"].values[control_start:]
+    roll_lataccel = np.sin(roll_rad) * 9.81
+
     roll = torch.tensor(
-        df["roll"].values[control_start:],
+        roll_lataccel,
         dtype=torch.float32,
         device=config.device,
     )
@@ -93,17 +97,21 @@ def load_segment(segment_path: Path, config: PGTOConfig) -> Segment:
     )
 
     # Warmup actions
-    warmup_actions = df["steerCommand"].values[warmup_start:control_start]
+    warmup_actions = -np.array(df["steerCommand"].values[warmup_start:control_start])
 
     # Warmup states
-    warmup_roll = df["roll"].values[warmup_start:control_start]
+    warmup_roll_rad = df["roll"].values[warmup_start:control_start]
+    warmup_roll_lataccel = np.sin(warmup_roll_rad) * 9.81
+
     warmup_v_ego = df["vEgo"].values[warmup_start:control_start]
     warmup_a_ego = df["aEgo"].values[warmup_start:control_start]
 
-    initial_history_states = initial_history_states = torch.stack(
+    initial_history_states = torch.stack(
         [
             torch.tensor(warmup_actions, dtype=torch.float32, device=config.device),
-            torch.tensor(warmup_roll, dtype=torch.float32, device=config.device),
+            torch.tensor(
+                warmup_roll_lataccel, dtype=torch.float32, device=config.device
+            ),
             torch.tensor(warmup_v_ego, dtype=torch.float32, device=config.device),
             torch.tensor(warmup_a_ego, dtype=torch.float32, device=config.device),
         ],
