@@ -24,6 +24,7 @@ class BatchedPhysics(nn.Module):
         self.model = (
             onnx2torch.convert(self.config.onnx_model_path).to(self.device).eval()
         )
+        self._traced = False
 
         # Bins for tokenization
         self.register_buffer("bins", torch.linspace(-5, 5, 1024, device=self.device))
@@ -44,7 +45,11 @@ class BatchedPhysics(nn.Module):
         Returns:
             logits: [B, 1024] - logits over lataccel bins
         """
-        return self.model(states, tokens)[:, -1, :]
+        if not self._traced:
+            self.model = torch.jit.trace(self.model, (states, tokens))
+            self._traced = True
+
+        return self.model(states, tokens)[:, -1, :]  # pyright: ignore[reportCallIssue]
 
     @torch.no_grad()
     def sample(
