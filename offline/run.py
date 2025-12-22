@@ -33,6 +33,12 @@ def main() -> None:
         help="Process segments 0 to max",
     )
     parser.add_argument(
+        "--min-segment",
+        type=int,
+        default=0,
+        help="Start processing from this segment ID (default 0)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -58,7 +64,11 @@ def main() -> None:
 
     # Get segments this worker should process
     all_segments = get_segment_paths(Path(config.segments_dir))
-    segments = [p for p in all_segments if int(p.stem) <= args.max_segment]
+    segments = [
+        p
+        for p in all_segments
+        if args.min_segment <= int(p.stem) <= args.max_segment
+    ]
     my_segments = segments[args.worker_id :: args.num_workers]
 
     # Count already done
