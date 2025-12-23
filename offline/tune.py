@@ -11,18 +11,17 @@ from offline.segment import load_segment
 def objective(trial: optuna.Trial) -> float:
     """Test PGTO parameters on first 5 files and return mean cost."""
     params = {
-        "horizon": trial.suggest_int("horizon", 8, 12),
-        "noise_window": trial.suggest_int("noise_window", 1, 4),
-        "noise_std": trial.suggest_float("noise_std", 0.01, 0.3, log=True),
-        "w_action_smooth": trial.suggest_float("w_action_smooth", 1.0, 8.0),
+        "noise_window": trial.suggest_int("noise_window", 1, 2),
+        "noise_std": trial.suggest_float("noise_std", 0.01, 0.8, log=True),
+        "w_action_smooth": trial.suggest_float("w_action_smooth", 4.0, 8.0),
     }
     print(f"Testing: {params}")
 
     try:
         config = PGTOConfig(
-            num_restarts=3,
+            num_restarts=5,
             K=2048,
-            horizon=params["horizon"],
+            horizon=10,
             noise_window=params["noise_window"],
             noise_std=params["noise_std"],
             w_action_smooth=params["w_action_smooth"],
@@ -60,7 +59,7 @@ def main():
     )
 
     pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=15,
+        n_startup_trials=10,
         n_warmup_steps=1,
         interval_steps=1,
     )
@@ -69,7 +68,7 @@ def main():
         sampler=sampler,
         pruner=pruner,
         storage="sqlite:///optuna_pgto_study.db",
-        study_name="pgto_hyperparameter_search_5_fixed",
+        study_name="pgto_hyperparameter_search_final",
         direction="minimize",
         load_if_exists=True,
     )
