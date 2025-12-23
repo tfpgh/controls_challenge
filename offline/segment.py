@@ -43,7 +43,7 @@ class Segment:
         """
 
         def pad_to_horizon(tensor: torch.Tensor) -> torch.Tensor:
-            # We need horizon + 1 steps for the cost calculation (t+1 to t+H+1)
+            # We need horizon + 1 for future_targets feature (targets[h+1:] at h=H-1 needs 1 element)
             req_len = horizon + 1
             future = tensor[t : t + req_len]
             if len(future) < req_len:
