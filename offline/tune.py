@@ -67,13 +67,13 @@ def objective(trial: optuna.Trial) -> float:
 
 def main():
     sampler = optuna.samplers.TPESampler(
-        n_startup_trials=20,
+        n_startup_trials=25,
         multivariate=True,
         group=True,
     )
 
     pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=15,
+        n_startup_trials=12,
         n_warmup_steps=1,
         interval_steps=1,
     )
@@ -82,7 +82,7 @@ def main():
         sampler=sampler,
         pruner=pruner,
         storage="sqlite:///optuna_pgto_study.db",
-        study_name="pgto_hyperparameter_search_variance",
+        study_name="pgto_hyperparameter_search_variance_smooth",
         direction="minimize",
         load_if_exists=True,
     )
