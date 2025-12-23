@@ -57,11 +57,10 @@ class ParallelRollout:
         tokens = history_tokens.clone()
         cmaes_batch = cmaes_state.clone()
         prev_lat = prev_lataccel.clone()
-        prev_action_h = prev_action.clone()
 
         total_tracking = torch.zeros(RK, device=self.config.device)
         total_jerk = torch.zeros(RK, device=self.config.device)
-        total_action_smooth = torch.zeros(RK, device=self.config.device)  # Accumulate
+        total_variance = torch.zeros(RK, device=self.config.device)
         first_actions = None
 
         for h in range(H):
@@ -103,9 +102,6 @@ class ParallelRollout:
             if first_actions is None:
                 first_actions = actions.clone()
 
-            total_action_smooth += (actions - prev_action_h) ** 2
-            prev_action_h = actions
-
             # Update state history
             new_state = torch.stack(
                 [
@@ -119,7 +115,9 @@ class ParallelRollout:
             states = torch.cat([states[:, 1:, :], new_state.unsqueeze(1)], dim=1)
 
             # Deterministic physics step
-            pred_lat = self.physics.expectation(states, tokens, prev_lat)
+            pred_lat, pred_var = self.physics.expectation_and_variance(
+                states, tokens, prev_lat
+            )
 
             # Costs
             tracking_error = pred_lat - target_h
@@ -127,6 +125,7 @@ class ParallelRollout:
 
             total_tracking += tracking_error**2
             total_jerk += jerk**2
+            total_variance += pred_var
 
             # Update CMA-ES state
             cmaes_batch.prev_error = error_h
@@ -145,7 +144,7 @@ class ParallelRollout:
         costs = (
             self.config.w_tracking * total_tracking
             + self.config.w_jerk * total_jerk
-            + (10**self.config.w_action_smooth) * total_action_smooth
+            + self.config.w_variance * total_variance
         )
 
         return costs, first_actions

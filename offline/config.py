@@ -13,7 +13,7 @@ class PGTOConfig:
     horizon: int = 11  # Lookahead horizon
     noise_window: int = 2  # Steps within horizon to inject noise
     noise_std: float = 0.06  # Noise standard deviation
-    w_action_smooth: float = 4.8  # Action smoothing
+    w_variance: float = 1.0  # Linear multiplier to variance penalty
 
     # Evaluation (match eval.py/tinyphysics.py)
     w_tracking: float = 5000.0

@@ -24,10 +24,8 @@ def objective(trial: optuna.Trial) -> float:
     ]
 
     params = {
-        "horizon": trial.suggest_int("horizon", 5, 16),
-        "noise_window": trial.suggest_int("noise_window", 1, 2),
-        "noise_std": trial.suggest_float("noise_std", 0.01, 0.8, log=True),
-        "w_action_smooth": trial.suggest_float("w_action_smooth", 4.0, 9.0),
+        "noise_std": trial.suggest_float("noise_std", 0.01, 0.20, log=True),
+        "w_variance": trial.suggest_float("w_variance", 0.33, 4.0),
     }
     print(f"Testing: {params}")
 
@@ -35,10 +33,10 @@ def objective(trial: optuna.Trial) -> float:
         config = PGTOConfig(
             num_restarts=3,
             K=2048,
-            horizon=params["horizon"],
-            noise_window=params["noise_window"],
+            horizon=12,
+            noise_window=2,
             noise_std=params["noise_std"],
-            w_action_smooth=params["w_action_smooth"],
+            w_variance=params["w_variance"],
         )
         optimizer = PGTOOptimizer(config)
 
@@ -67,13 +65,13 @@ def objective(trial: optuna.Trial) -> float:
 
 def main():
     sampler = optuna.samplers.TPESampler(
-        n_startup_trials=50,
+        n_startup_trials=20,
         multivariate=True,
         group=True,
     )
 
     pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=25,
+        n_startup_trials=15,
         n_warmup_steps=1,
         interval_steps=1,
     )
@@ -82,7 +80,7 @@ def main():
         sampler=sampler,
         pruner=pruner,
         storage="sqlite:///optuna_pgto_study.db",
-        study_name="pgto_hyperparameter_search_representative",
+        study_name="pgto_hyperparameter_search_variance",
         direction="minimize",
         load_if_exists=True,
     )

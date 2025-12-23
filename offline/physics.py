@@ -81,14 +81,14 @@ class BatchedPhysics(nn.Module):
         return lataccel
 
     @torch.no_grad()
-    def expectation(
+    def expectation_and_variance(
         self,
         states: torch.Tensor,
         tokens: torch.Tensor,
         prev_lataccel: torch.Tensor,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        Deterministic expectation (for efficient candidate comparison).
+        Deterministic expectation and variance (for efficient candidate comparison).
 
 
         Args:
@@ -98,10 +98,15 @@ class BatchedPhysics(nn.Module):
 
         Returns:
             lataccel: [B] - expected value, clamped
+            variance: [B]
         """
         logits = self.forward(states, tokens)
         probs = F.softmax(logits / self.config.physics_temperature, dim=-1)
+
         lataccel = (probs * self.bins).sum(dim=-1)
+
+        lataccel_sq = (probs * self.bins * self.bins).sum(dim=-1)
+        variance = lataccel_sq - lataccel**2
 
         # Clamp
         lataccel = torch.clamp(
@@ -110,7 +115,7 @@ class BatchedPhysics(nn.Module):
             prev_lataccel + self.config.max_acc_delta,
         )
 
-        return lataccel
+        return lataccel, variance
 
     def tokenize(self, lataccel: torch.Tensor) -> torch.Tensor:
         """Convert lataccel values to token indices."""
