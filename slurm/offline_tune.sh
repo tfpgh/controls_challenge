@@ -13,4 +13,7 @@ echo "Starting Optuna worker ${SLURM_ARRAY_TASK_ID} on $(hostname)"
 echo "SLURM assigned GPU devices: ${CUDA_VISIBLE_DEVICES}"
 echo "GPU device count: $(nvidia-smi --list-gpus | wc -l)"
 
+echo "Sleeping for ${SLURM_ARRAY_TASK_ID} seconds to avoid optuna race condition"
+sleep $SLURM_ARRAY_TASK_ID
+
 uv run python -m offline.tune
