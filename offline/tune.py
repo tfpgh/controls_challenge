@@ -82,7 +82,7 @@ def main():
         sampler=sampler,
         pruner=pruner,
         storage="sqlite:///optuna_pgto_study.db",
-        study_name="pgto_hyperparameter_search_fixed_for_good_i_think",
+        study_name="pgto_hyperparameter_search_fixed_for_good_i_think_2.0_scout_please_make_this_work",
         direction="minimize",
         load_if_exists=True,
     )
