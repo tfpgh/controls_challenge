@@ -26,7 +26,7 @@ def objective(trial: optuna.Trial) -> float:
     params = {
         "noise_std": trial.suggest_float("noise_std", 0.01, 0.30, log=True),
         "w_action_smooth": trial.suggest_float("w_action_smooth", 1.0, 10.0),
-        "w_variance": trial.suggest_float("w_variance", 0.1, 10.0, log=True),
+        "w_variance": trial.suggest_float("w_variance", 0.33, 3.0, log=True),
     }
     print(f"Testing: {params}")
 
@@ -67,13 +67,13 @@ def objective(trial: optuna.Trial) -> float:
 
 def main():
     sampler = optuna.samplers.TPESampler(
-        n_startup_trials=25,
+        n_startup_trials=15,
         multivariate=True,
         group=True,
     )
 
     pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=12,
+        n_startup_trials=10,
         n_warmup_steps=1,
         interval_steps=1,
     )
@@ -82,7 +82,7 @@ def main():
         sampler=sampler,
         pruner=pruner,
         storage="sqlite:///optuna_pgto_study.db",
-        study_name="pgto_hyperparameter_search_variance_smooth",
+        study_name="pgto_hyperparameter_search_fixed_for_good_i_think",
         direction="minimize",
         load_if_exists=True,
     )
