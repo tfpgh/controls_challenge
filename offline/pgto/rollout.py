@@ -31,6 +31,7 @@ class ParallelRollout:
         cmaes_state: CMAESState,  # Batch size R*K
         future_context: FutureContext,  # {targets, roll, v_ego, a_ego} each [H]
         noise: torch.Tensor,  # [R*K, noise_window]
+        horizon: int,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Evaluate R*K candidates over H-step horizon.
@@ -50,7 +51,7 @@ class ParallelRollout:
             first_actions: [R*K] first action taken by each candidate
         """
         RK = history_states.shape[0]
-        H = self.config.horizon
+        H = horizon
 
         # Clone for rollout
         states = history_states.clone()
@@ -153,6 +154,6 @@ class ParallelRollout:
             + self.config.w_variance
             * self.config.w_tracking
             * total_variance  # Must scale by tracking weight
-        )
+        ) / H
 
         return costs, first_actions

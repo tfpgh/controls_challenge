@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,7 @@ from offline.pgto.optimizer import PGTOOptimizer
 from offline.segment import load_segment
 
 
-def objective(trial: optuna.Trial) -> float:
+def objective(trial: optuna.Trial) -> tuple[float, float]:
     """Test PGTO parameters on representative files and return mean cost."""
     SEGMENTS = [
         "00432",
@@ -24,66 +25,69 @@ def objective(trial: optuna.Trial) -> float:
     ]
 
     params = {
-        "noise_std": trial.suggest_float("noise_std", 0.01, 0.30, log=True),
-        "w_action_smooth": trial.suggest_float("w_action_smooth", 1.0, 10.0),
-        "w_variance": trial.suggest_float("w_variance", 0.33, 3.0, log=True),
+        "K": trial.suggest_categorical("K", [128, 256, 512, 768, 1024]),
+        "n_iterations_max": trial.suggest_int("n_iterations_max", 2, 5),
+        "elite_frac": trial.suggest_float("elite_frac", 0.02, 0.2),
+        "horizon_init": trial.suggest_int("horizon_init", 4, 10),
+        "horizon_scale": trial.suggest_float("horizon_scale", 1.0, 1.3),
+        "noise_window": trial.suggest_int("noise_window", 1, 4),
+        "noise_std_init": trial.suggest_float("noise_std_init", 0.02, 0.20, log=True),
+        "w_action_smooth": trial.suggest_float("w_action_smooth", 3.5, 6.0),
+        "shift_threshold": trial.suggest_float(
+            "shift_threshold", 0.001, 0.05, log=True
+        ),
     }
     print(f"Testing: {params}")
 
     try:
         config = PGTOConfig(
             num_restarts=3,
-            K=2048,
-            horizon=12,
-            noise_window=2,
-            noise_std=params["noise_std"],
+            K=params["K"],
+            n_iterations_max=params["n_iterations_max"],
+            elite_frac=params["elite_frac"],
+            horizon_init=params["horizon_init"],
+            horizon_scale=params["horizon_scale"],
+            noise_window=params["noise_window"],
+            noise_std_init=params["noise_std_init"],
             w_action_smooth=params["w_action_smooth"],
-            w_variance=params["w_variance"],
+            shift_threshold=params["shift_threshold"],
         )
         optimizer = PGTOOptimizer(config)
 
-        total = 0.0
+        total_cost = 0.0
+        total_time = 0.0
+
         for i, seg_id in enumerate(SEGMENTS):
             segment = load_segment(Path(f"data/{seg_id}.csv"), config)
+
+            start = time.time()
             result = optimizer.optimize(segment, verbose=False)
-            total += float(np.mean([r.cost for r in result.restarts]))
+            elapsed = time.time() - start
 
-            # Report running average
-            avg_so_far = total / (i + 1)
-            trial.report(avg_so_far, step=i)
-            print(f"  Segment {seg_id}: avg so far = {avg_so_far:.2f}")
+            total_cost += float(np.mean([r.cost for r in result.restarts]))
+            total_time += elapsed
 
-            if trial.should_prune():
-                raise optuna.TrialPruned()
+        avg_cost = total_cost / len(SEGMENTS)
+        avg_time = total_time / len(SEGMENTS)
 
-        return total / len(SEGMENTS)
-
-    except optuna.TrialPruned:
-        raise
+        return avg_cost, avg_time
     except Exception as e:
         print(f"Trial failed: {e}")
-        raise optuna.TrialPruned()
+        return float("inf"), float("inf")  # Return bad values instead of pruning
 
 
 def main():
     sampler = optuna.samplers.TPESampler(
-        n_startup_trials=100,
+        n_startup_trials=25,
         multivariate=True,
-        group=True,
-    )
-
-    pruner = optuna.pruners.MedianPruner(
-        n_startup_trials=10,
-        n_warmup_steps=1,
-        interval_steps=1,
+        constant_liar=True,
     )
 
     study = optuna.create_study(
         sampler=sampler,
-        pruner=pruner,
         storage="sqlite:///optuna_pgto_study.db",
-        study_name="pgto_hyperparameter_search_fixed_for_good_i_think_2.0_scout_please_make_this_work",
-        direction="minimize",
+        study_name="pgto_hyperparameter_search_multi",
+        directions=["minimize", "minimize"],
         load_if_exists=True,
     )
 

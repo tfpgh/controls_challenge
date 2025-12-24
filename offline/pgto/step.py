@@ -51,41 +51,97 @@ class PGTOStep:
             best_actions: [R] optimal action for each restart
 
         """
-        R, K = self.config.num_restarts, self.config.K
+        R = self.config.num_restarts
+        K = self.config.K
+
         assert K % 2 == 0, "K must be even for antithetic sampling"
+        half_K = K // 2
+
         RK = R * K
 
-        # Expand states from R to R*K (each restart has K candidates)
-        states_expanded = history_states.repeat_interleave(K, dim=0)  # [R*K, 20, 4]
-        tokens_expanded = history_tokens.repeat_interleave(K, dim=0)  # [R*K, 20]
-        prev_lat_expanded = prev_lataccel.repeat_interleave(K)  # [R*K]
-        prev_action_expanded = prev_action.repeat_interleave(K)  # [R*K]
-        cmaes_expanded = cmaes_state.expand(RK)
+        best_actions = None
+        best_costs = torch.full((R,), float("inf"), device=self.config.device)
 
-        # Antithetic noise: generate half, mirror within each restart
-        half_noise = (
-            torch.randn(R, K // 2, self.config.noise_window, device=self.config.device)
-            * self.config.noise_std
-        )
-        noise = torch.cat([half_noise, -half_noise], dim=1)  # [R, K, noise_window]
-        noise = noise.view(RK, self.config.noise_window)  # [R*K, noise_window]
-
-        # Evaluate all candidates
-        costs, first_actions = self.rollout.evaluate_candidates(
-            history_states=states_expanded,
-            history_tokens=tokens_expanded,
-            prev_lataccel=prev_lat_expanded,
-            prev_action=prev_action_expanded,
-            cmaes_state=cmaes_expanded,
-            future_context=future_context,
-            noise=noise,
+        mean = torch.zeros(R, self.config.noise_window, device=self.config.device)
+        std = torch.full(
+            (R, self.config.noise_window),
+            self.config.noise_std_init,
+            device=self.config.device,
         )
 
-        # Reshape to [R, K]
-        costs = costs.view(R, K)
-        first_actions = first_actions.view(R, K)
+        prev_mean = mean.clone()
 
-        best_idx = costs.argmin(dim=1)
-        best_actions = first_actions.gather(1, best_idx.unsqueeze(1)).squeeze(1)
+        for iteration in range(self.config.n_iterations_max):
+            horizon = int(
+                self.config.horizon_init * (self.config.horizon_scale**iteration)
+            )
+
+            # Expand states from R to R*K (each restart has K candidates)
+            states_expanded = history_states.repeat_interleave(K, dim=0)  # [R*K, 20, 4]
+            tokens_expanded = history_tokens.repeat_interleave(K, dim=0)  # [R*K, 20]
+            prev_lat_expanded = prev_lataccel.repeat_interleave(K)  # [R*K]
+            prev_action_expanded = prev_action.repeat_interleave(K)  # [R*K]
+            cmaes_expanded = cmaes_state.expand(RK)
+
+            # Antithetic noise: generate half, mirror within each restart
+            half_noise = torch.randn(
+                R, half_K, self.config.noise_window, device=self.config.device
+            ) * std.unsqueeze(1)
+            noise = torch.cat([half_noise, -half_noise], dim=1)  # [R, K, noise_window]
+
+            # Add mean offset to get candidates
+            candidates = mean.unsqueeze(1) + noise  # [R, K, noise_window]
+
+            noise_flat = candidates.view(RK, self.config.noise_window)
+
+            # Evaluate all candidates
+            costs, first_actions = self.rollout.evaluate_candidates(
+                history_states=states_expanded,
+                history_tokens=tokens_expanded,
+                prev_lataccel=prev_lat_expanded,
+                prev_action=prev_action_expanded,
+                cmaes_state=cmaes_expanded,
+                future_context=future_context,
+                noise=noise_flat,
+                horizon=horizon,
+            )
+
+            # Reshape to [R, K]
+            costs = costs.view(R, K)
+            first_actions = first_actions.view(R, K)
+            candidates = candidates.view(R, K, self.config.noise_window)
+
+            # Track best ever across all iterations
+            iter_best_costs, iter_best_idx = costs.min(dim=1)
+            iter_best_actions = first_actions.gather(
+                1, iter_best_idx.unsqueeze(1)
+            ).squeeze(1)
+
+            improved = iter_best_costs < best_costs
+            best_costs = torch.where(improved, iter_best_costs, best_costs)
+            if best_actions is None:
+                best_actions = iter_best_actions
+            else:
+                best_actions = torch.where(improved, iter_best_actions, best_actions)
+
+            # Select elites
+            n_elite = max(1, int(K * self.config.elite_frac))
+            elite_idx = costs.argsort(dim=1)[:, :n_elite]  # [R, n_elite]
+
+            elite_candidates = candidates.gather(
+                1, elite_idx.unsqueeze(-1).expand(-1, -1, self.config.noise_window)
+            )
+
+            prev_mean = mean.clone()
+            mean = elite_candidates.mean(dim=1)  # [R, noise_window]
+            std = elite_candidates.std(dim=1).clamp(min=0.01)  # [R, noise_window]
+
+            # Early termination
+            if iteration > 0:
+                shift = (mean - prev_mean).norm(dim=1).max()
+                if shift < self.config.shift_threshold:
+                    break
+
+        assert best_actions is not None
 
         return best_actions
