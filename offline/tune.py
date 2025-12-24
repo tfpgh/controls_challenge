@@ -67,7 +67,7 @@ def objective(trial: optuna.Trial) -> float:
 
 def main():
     sampler = optuna.samplers.TPESampler(
-        n_startup_trials=15,
+        n_startup_trials=90,
         multivariate=True,
         group=True,
     )
