@@ -217,7 +217,13 @@ class PGTOOptimizer:
 
         for t in iterator:
             target_t = segment.targets[t]
-            future_context = segment.get_future_context(t, self.config.horizon)
+
+            # Max horizon across all CEM iterations
+            max_horizon = int(
+                self.config.horizon_init
+                * (self.config.horizon_scale ** (self.config.n_iterations_max - 1))
+            )
+            future_context = segment.get_future_context(t, max_horizon)
 
             # Record current state BEFORE taking action
             all_history_states[:, t] = history_states
