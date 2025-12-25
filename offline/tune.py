@@ -25,13 +25,13 @@ def objective(trial: optuna.Trial) -> tuple[float, float]:
     ]
 
     params = {
-        "K": trial.suggest_categorical("K", [128, 256, 512, 768, 1024]),
-        "n_iterations_max": trial.suggest_int("n_iterations_max", 2, 5),
+        "K": trial.suggest_categorical("K", [64, 128, 256, 512, 768, 1024]),
+        "n_iterations_max": trial.suggest_int("n_iterations_max", 2, 10),
         "elite_frac": trial.suggest_float("elite_frac", 0.02, 0.2),
-        "horizon_init": trial.suggest_int("horizon_init", 4, 10),
+        "horizon_init": trial.suggest_int("horizon_init", 4, 12),
         "horizon_scale": trial.suggest_float("horizon_scale", 1.0, 1.3),
-        "noise_window": trial.suggest_int("noise_window", 1, 4),
-        "noise_std_init": trial.suggest_float("noise_std_init", 0.02, 0.20, log=True),
+        "noise_window": trial.suggest_int("noise_window", 1, 8),
+        "noise_std_init": trial.suggest_float("noise_std_init", 0.01, 0.20, log=True),
         "w_action_smooth": trial.suggest_float("w_action_smooth", 3.5, 6.0),
         "shift_threshold": trial.suggest_float(
             "shift_threshold", 0.001, 0.05, log=True
@@ -69,12 +69,12 @@ def objective(trial: optuna.Trial) -> tuple[float, float]:
     avg_cost = total_cost / len(SEGMENTS)
     avg_time = total_time / len(SEGMENTS)
 
-    return avg_cost, avg_time
+    return avg_cost, np.log(avg_time)
 
 
 def main():
     sampler = optuna.samplers.TPESampler(
-        n_startup_trials=25,
+        n_startup_trials=150,
         multivariate=True,
         constant_liar=True,
     )
@@ -82,7 +82,7 @@ def main():
     study = optuna.create_study(
         sampler=sampler,
         storage="sqlite:///optuna_pgto_study.db",
-        study_name="pgto_hyperparameter_search_multi_2",
+        study_name="pgto_hyperparameter_search_multi_log",
         directions=["minimize", "minimize"],
         load_if_exists=True,
     )
