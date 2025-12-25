@@ -25,8 +25,8 @@ def objective(trial: optuna.Trial) -> tuple[float, float]:
     ]
 
     params = {
-        "K": trial.suggest_categorical("K", [128, 256, 512, 768, 1024]),
-        "n_iterations_max": trial.suggest_int("n_iterations_max", 2, 10),
+        "K": trial.suggest_categorical("K", [32, 64, 128, 256, 512, 768, 1024]),
+        "n_iterations_max": trial.suggest_int("n_iterations_max", 2, 25),
         "elite_frac": trial.suggest_float("elite_frac", 0.02, 0.2),
         "horizon_init": trial.suggest_int("horizon_init", 4, 12),
         "horizon_scale": trial.suggest_float("horizon_scale", 1.0, 1.3),
@@ -74,7 +74,7 @@ def objective(trial: optuna.Trial) -> tuple[float, float]:
 
 def main():
     sampler = optuna.samplers.TPESampler(
-        n_startup_trials=150,
+        n_startup_trials=210,
         multivariate=True,
         constant_liar=True,
     )
