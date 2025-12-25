@@ -25,7 +25,7 @@ def objective(trial: optuna.Trial) -> tuple[float, float]:
     ]
 
     params = {
-        "K": trial.suggest_categorical("K", [64, 128, 256, 512, 768, 1024]),
+        "K": trial.suggest_categorical("K", [128, 256, 512, 768, 1024]),
         "n_iterations_max": trial.suggest_int("n_iterations_max", 2, 10),
         "elite_frac": trial.suggest_float("elite_frac", 0.02, 0.2),
         "horizon_init": trial.suggest_int("horizon_init", 4, 12),
