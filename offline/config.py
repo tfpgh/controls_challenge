@@ -70,4 +70,4 @@ class BCConfig:
     model_save_name: str = "bc_best.pt"
 
     # Device
-    device: str = "mps"
+    device: str = "cuda"
