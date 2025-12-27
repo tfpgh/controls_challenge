@@ -42,4 +42,32 @@ class PGTOConfig:
     device: str = "cuda"
 
 
-DEFAULT_CONFIG = PGTOConfig()
+@dataclass
+class BCConfig:
+    # Features
+    context_length: int = 20  # Past history length
+    future_length: int = 50  # Future context length
+    control_start_idx: int = 100  # When control begins (from tinyphysics)
+
+    # Model
+    input_size: int = 247
+    hidden_sizes: tuple[int, ...] = (512, 512, 256, 128)
+
+    # Training
+    batch_size: int = 4096
+    lr: float = 3e-4
+    weight_decay: float = 1e-5
+    epochs: int = 200
+
+    # Evaluation
+    eval_every_n_epochs: int = 50
+    eval_num_segments: int = 500
+
+    # Paths
+    pgto_data_dir: str = "data/pgto/"
+    segments_dir: str = "data/"
+    output_dir: str = "models/"
+    model_save_name: str = "bc_best.pt"
+
+    # Device
+    device: str = "mps"
