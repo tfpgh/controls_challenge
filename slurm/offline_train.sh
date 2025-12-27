@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #SBATCH --job-name=offline_train
-#SBATCH --output=logs/%A_%a.out
+#SBATCH --output=logs/%j.out
 #SBATCH --partition=gpu-standard
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32gb
