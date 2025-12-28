@@ -19,7 +19,7 @@ class BCModel(nn.Module):
         layers: list[nn.Module] = []
 
         # Input norm
-        layers.append(nn.LayerNorm(config.input_size))
+        layers.append(nn.BatchNorm1d(config.input_size))
 
         # Hidden layers
         prev_size = config.input_size
