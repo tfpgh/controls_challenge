@@ -30,6 +30,9 @@ class SegmentStats:
     targets: np.ndarray  # [T]
     current_lataccels: list[np.ndarray]  # [R] x [T]
 
+    # Iterations data
+    iterations_per_step: np.ndarray  # [T]
+
 
 def load_segment_stats(pt_path: Path) -> SegmentStats:
     """Load statistics from a single .pt file."""
@@ -40,6 +43,7 @@ def load_segment_stats(pt_path: Path) -> SegmentStats:
     actions = []
     current_lataccels = []
     targets = None
+    iterations_per_step = None
 
     for i in range(num_restarts):
         cost = data[f"restart_{i}_cost"]
@@ -52,8 +56,13 @@ def load_segment_stats(pt_path: Path) -> SegmentStats:
         current_lataccels.append(traj["current_lataccel"].numpy())
         if targets is None:
             targets = traj["targets"].numpy()
+        if iterations_per_step is None and "iterations_per_step" in traj:
+            iterations_per_step = traj["iterations_per_step"].numpy()
 
     costs = np.array(costs)
+
+    if iterations_per_step is None:
+        iterations_per_step = np.array([])
 
     return SegmentStats(
         segment_id=data["segment_id"],
@@ -65,6 +74,7 @@ def load_segment_stats(pt_path: Path) -> SegmentStats:
         actions=actions,
         targets=targets,
         current_lataccels=current_lataccels,
+        iterations_per_step=iterations_per_step,
     )
 
 
@@ -167,17 +177,30 @@ def print_report(segments: list[SegmentStats], progress: dict):
     )
     print("  └──────────────────────────────────────────────────────────────┘")
 
-    # ALL SEGMENTS TABLE - crucial for understanding
-    print(f"\n{'═' * 30} ALL SEGMENTS {'═' * 30}")
-    print(f"  {'Segment':<10} {'Mean':>8} {'Std':>8} {'Best':>8} {'Worst':>8} {'R':>4}")
-    print(f"  {'-' * 10} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 4}")
-    for s in sorted_segments:
+    # TOP/BOTTOM SEGMENTS
+    n_show = 20
+    print(f"\n{'═' * 30} BEST {n_show} SEGMENTS {'═' * 30}")
+    print(f"  {'Segment':<10} {'Mean':>8} {'Std':>8} {'Best':>8} {'Worst':>8}")
+    print(f"  {'-' * 10} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8}")
+    for s in sorted_segments[:n_show]:
         print(
-            f"  {s.segment_id:<10} {s.mean_cost:>8.1f} {s.std_cost:>8.1f} {s.best_cost:>8.1f} {s.worst_cost:>8.1f} {len(s.restart_costs):>4}"
+            f"  {s.segment_id:<10} {s.mean_cost:>8.1f} {s.std_cost:>8.1f} {s.best_cost:>8.1f} {s.worst_cost:>8.1f}"
         )
-    print(f"  {'-' * 10} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 4}")
+
+    print(f"\n{'═' * 30} WORST {n_show} SEGMENTS {'═' * 30}")
+    print(f"  {'Segment':<10} {'Mean':>8} {'Std':>8} {'Best':>8} {'Worst':>8}")
+    print(f"  {'-' * 10} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8}")
+    for s in sorted_segments[-n_show:]:
+        print(
+            f"  {s.segment_id:<10} {s.mean_cost:>8.1f} {s.std_cost:>8.1f} {s.best_cost:>8.1f} {s.worst_cost:>8.1f}"
+        )
+
+    # Summary stats
+    print(f"\n{'═' * 30} SEGMENT SUMMARY {'═' * 30}")
+    print(f"  {'':>15} {'Mean':>8} {'Std':>8} {'Best':>8} {'Worst':>8}")
+    print(f"  {'-' * 15} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8}")
     print(
-        f"  {'MEAN':<10} {segment_means.mean():>8.1f} {np.mean([s.std_cost for s in segments]):>8.1f} {segment_bests.mean():>8.1f} {np.mean([s.worst_cost for s in segments]):>8.1f}"
+        f"  {'Average':<15} {segment_means.mean():>8.1f} {np.mean([s.std_cost for s in segments]):>8.1f} {segment_bests.mean():>8.1f} {np.mean([s.worst_cost for s in segments]):>8.1f}"
     )
 
     # Cost distribution
@@ -190,6 +213,54 @@ def print_report(segments: list[SegmentStats], progress: dict):
     print(f"    75th percentile:  {np.percentile(all_restart_costs, 75):>8.1f}")
     print(f"    95th percentile:  {np.percentile(all_restart_costs, 95):>8.1f}")
     print(f"    Max:              {all_restart_costs.max():>8.1f}")
+
+    # Cost histogram
+    print("\n  Cost histogram:")
+    bins = [0, 30, 40, 50, 60, 80, 100, 150, float("inf")]
+    bin_labels = [
+        "<30",
+        "30-40",
+        "40-50",
+        "50-60",
+        "60-80",
+        "80-100",
+        "100-150",
+        ">150",
+    ]
+    hist, _ = np.histogram(segment_means, bins=bins)
+    for label, count in zip(bin_labels, hist):
+        bar = "█" * (count * 40 // len(segments)) if len(segments) > 0 else ""
+        print(
+            f"    {label:>8}: {count:>4} ({count / len(segments) * 100:>5.1f}%) {bar}"
+        )
+
+    # Iterations analysis
+    all_iterations = np.concatenate(
+        [s.iterations_per_step for s in segments if len(s.iterations_per_step) > 0]
+    )
+    if len(all_iterations) > 0:
+        print(f"\n{'═' * 30} ITERATIONS ANALYSIS {'═' * 30}")
+        print(f"  Iterations per step (n={len(all_iterations)}):")
+        print(f"    Mean:             {all_iterations.mean():>8.2f}")
+        print(f"    Std:              {all_iterations.std():>8.2f}")
+        print(f"    Min:              {all_iterations.min():>8.0f}")
+        print(f"    Max:              {all_iterations.max():>8.0f}")
+        print(f"    Median:           {np.median(all_iterations):>8.0f}")
+
+        # Iteration histogram
+        print("\n  Iterations histogram:")
+        iter_bins = list(range(1, 12)) + [20]
+        iter_hist, _ = np.histogram(all_iterations, bins=iter_bins)
+        for i, count in enumerate(iter_hist):
+            label = f"{iter_bins[i]}" if i < len(iter_hist) - 1 else f"{iter_bins[i]}+"
+            bar = (
+                "█" * (count * 40 // len(all_iterations))
+                if len(all_iterations) > 0
+                else ""
+            )
+            print(
+                f"    {label:>4}: {count:>8} ({count / len(all_iterations) * 100:>5.1f}%) {bar}"
+            )
 
     # Variance analysis
     within_stds = np.array([s.std_cost for s in segments])
@@ -231,7 +302,6 @@ def print_report(segments: list[SegmentStats], progress: dict):
         targets = s.targets
         for lataccels in s.current_lataccels:
             if len(lataccels) > 1:
-                # Error at t: how well did we track target[t-1] with result lataccel[t]
                 errors = targets[:-1] - lataccels[1:]
                 all_tracking_errors.extend(errors)
 
@@ -259,12 +329,16 @@ def print_report(segments: list[SegmentStats], progress: dict):
     # High cost segments (potential issues)
     high_cost = [s for s in segments if s.mean_cost > 150]
     if high_cost:
-        print(f"\n  ⚠️  High cost segments (>150): {[s.segment_id for s in high_cost]}")
+        print(f"\n  ⚠️  High cost segments (>150): {len(high_cost)} segments")
+        print(
+            f"      IDs: {[s.segment_id for s in high_cost[:10]]}{'...' if len(high_cost) > 10 else ''}"
+        )
 
     high_variance = [s for s in segments if s.std_cost > 30]
     if high_variance:
+        print(f"  ⚠️  High variance segments (std>30): {len(high_variance)} segments")
         print(
-            f"  ⚠️  High variance segments (std>30): {[s.segment_id for s in high_variance]}"
+            f"      IDs: {[s.segment_id for s in high_variance[:10]]}{'...' if len(high_variance) > 10 else ''}"
         )
 
     # Leaderboard context
