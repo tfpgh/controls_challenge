@@ -73,9 +73,8 @@ def main() -> None:
     my_segments = remaining[args.worker_id :: args.num_workers]
 
     print(f"Worker {args.worker_id}/{args.num_workers}")
-    print(f"  Segments assigned: {len(my_segments)}")
-    print(f"  Already complete: {len(my_segments) - len(remaining)}")
-    print(f"  Remaining: {len(remaining)}")
+    print(f"  Total incomplete: {len(remaining)}")
+    print(f"  This worker's share: {len(my_segments)}")
     print(f"  Config: K={config.K}, restarts={config.num_restarts}")
 
     if not remaining:
@@ -86,7 +85,7 @@ def main() -> None:
     optimizer = PGTOOptimizer(config)
 
     # Process segments
-    pbar = tqdm(remaining, desc=f"Worker {args.worker_id}")
+    pbar = tqdm(my_segments, desc=f"Worker {args.worker_id}")
     for segment_path in pbar:
         output_path = output_dir / f"{segment_path.stem}.pt"
 
