@@ -103,76 +103,51 @@ class BCModelCNN(nn.Module):
 
 class BCModelAsymmetric(nn.Module):
     """
-    Heavy regularization on past (shifts at eval).
-    Light regularization on future (no shift).
+    Asymmetric MLP: separate pathways for past vs future.
+    Light noise on past to handle distribution shift.
     """
 
     def __init__(self, config: BCConfig) -> None:
         super().__init__()
-        self.noise_std = 0.03
+        self.noise_std = 0.02  # Light noise on past only
 
-        # Past pathway: HEAVY regularization
-        # Input: 20 actions + 20 lataccels = 40
+        # Past pathway: 40 inputs (20 actions + 20 lataccels)
         self.past_encoder = nn.Sequential(
             nn.Linear(40, 256),
             nn.GELU(),
-            nn.Dropout(0.3),
             nn.Linear(256, 128),
-            nn.GELU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, 64),
             nn.GELU(),
         )
 
-        # Future pathway: LIGHT regularization
-        # Input: 50 × 4 = 200 (targets, roll, v_ego, a_ego)
+        # Future pathway: 200 inputs (50 × 4)
         self.future_encoder = nn.Sequential(
             nn.Linear(200, 512),
             nn.GELU(),
-            nn.Dropout(0.05),
             nn.Linear(512, 256),
-            nn.GELU(),
-            nn.Dropout(0.05),
-            nn.Linear(256, 128),
             nn.GELU(),
         )
 
-        # Current state pathway: minimal processing
-        # Input: 5 (target, lataccel, roll, v_ego, a_ego)
+        # Current state: 5 inputs
         self.current_encoder = nn.Sequential(
             nn.Linear(5, 64),
             nn.GELU(),
-            nn.Linear(64, 32),
-            nn.GELU(),
         )
 
-        # Merge: 64 + 128 + 32 + 2 = 226
+        # Head: 128 + 256 + 64 + 2 = 450
         self.head = nn.Sequential(
-            nn.Linear(226, 256),
+            nn.Linear(450, 256),
             nn.GELU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, 128),
-            nn.GELU(),
-            nn.Linear(128, 1),
+            nn.Linear(256, 1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         current = x[:, 0:5]
-        past_actions = x[:, 5:25]
-        past_lataccels = x[:, 25:45]
+        past = x[:, 5:45]
         future = x[:, 45:245]
         timestep = x[:, 245:247]
 
-        # Noise injection on past during training
-        if self.training:
-            past_actions = (
-                past_actions + torch.randn_like(past_actions) * self.noise_std
-            )
-            past_lataccels = (
-                past_lataccels + torch.randn_like(past_lataccels) * self.noise_std
-            )
-
-        past = torch.cat([past_actions, past_lataccels], dim=1)
+        if self.training and self.noise_std > 0:
+            past = past + torch.randn_like(past) * self.noise_std
 
         past_features = self.past_encoder(past)
         future_features = self.future_encoder(future)

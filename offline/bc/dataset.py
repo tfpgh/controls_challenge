@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 import numpy as np
@@ -38,7 +39,34 @@ class BCDataset(Dataset):
         self.features: torch.Tensor  # [N, 247]
         self.labels: torch.Tensor  # [N]
 
-        self._load_data(segment_ids, verbose)
+        self._load_data_cached(segment_ids, verbose)
+
+    def _load_data_cached(
+        self,
+        segment_ids: list[str],
+        verbose: bool,
+    ) -> None:
+        """Load data from cache if available, otherwise process and cache."""
+        # Create cache key from sorted segment IDs
+        cache_key = hashlib.md5("_".join(sorted(segment_ids)).encode()).hexdigest()[:12]
+        cache_path = self.pgto_dir / f"bc_cache_{cache_key}.pt"
+
+        if cache_path.exists():
+            if verbose:
+                print(f"Loading from cache: {cache_path}")
+            cached = torch.load(cache_path, weights_only=True)
+            self.features = cached["features"]
+            self.labels = cached["labels"]
+            if verbose:
+                print(f"Loaded {len(self)} samples from cache")
+        else:
+            if verbose:
+                print("Cache not found, processing segments...")
+            self._load_data(segment_ids, verbose)
+
+            if verbose:
+                print(f"Saving cache to: {cache_path}")
+            torch.save({"features": self.features, "labels": self.labels}, cache_path)
 
     def _load_data(
         self,
