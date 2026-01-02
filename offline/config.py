@@ -61,7 +61,7 @@ class BCConfig:
 
     # Evaluation
     eval_every_n_epochs: int = 50
-    eval_num_segments: int = 500
+    eval_num_segments: int = 5000
 
     # Paths
     pgto_data_dir: str = "data/pgto/"
