@@ -60,7 +60,7 @@ class BCConfig:
     epochs: int = 250
 
     # Evaluation
-    eval_every_n_epochs: int = 5
+    eval_every_n_epochs: int = 50
     eval_num_segments: int = 500
 
     # Paths

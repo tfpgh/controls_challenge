@@ -25,7 +25,7 @@ def train(config: BCConfig) -> None:
 
     # Get segment IDs and split
     logger.info("Loading segment IDs...")
-    segment_ids = get_segment_ids(Path(config.pgto_data_dir))[:25]
+    segment_ids = get_segment_ids(Path(config.pgto_data_dir))
     logger.info(f"Training on {len(segment_ids)} segments")
 
     # Load dataset
