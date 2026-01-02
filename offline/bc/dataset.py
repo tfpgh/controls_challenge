@@ -263,4 +263,6 @@ def get_segment_ids(pgto_dir: Path) -> list[str]:
     """
     Get all available segment IDs from PGTO output directory.
     """
-    return sorted([p.stem for p in pgto_dir.glob("*.pt")])
+    return sorted(
+        [p.stem for p in pgto_dir.glob("*.pt") if not p.stem.startswith("bc_cache")]
+    )
