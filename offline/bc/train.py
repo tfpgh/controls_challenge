@@ -3,6 +3,7 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 
 import logging
+from dataclasses import fields
 from pathlib import Path
 
 import torch
@@ -123,4 +124,10 @@ def train(config: BCConfig) -> None:
 
 
 if __name__ == "__main__":
-    train(BCConfig())
+    config = BCConfig()
+
+    logger.info("Config:")
+    for field in fields(config):
+        logger.info(f"  {field.name}: {getattr(config, field.name)}")
+
+    train(config)
