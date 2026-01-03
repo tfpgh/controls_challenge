@@ -66,33 +66,46 @@ class BCModelAsymmetric(nn.Module):
 
     def __init__(self, config: BCConfig) -> None:
         super().__init__()
-        self.noise_std = 0.025
+        self.noise_std = 0.012
 
-        # Past pathway: 40 inputs (20 actions + 20 lataccels)
+        # Past pathway: keep relatively small (shifts at eval)
+        # 40 → 256 → 128 → 128
         self.past_encoder = nn.Sequential(
             nn.Linear(40, 256),
             nn.GELU(),
             nn.Linear(256, 128),
             nn.GELU(),
+            nn.Linear(128, 128),
+            nn.GELU(),
         )
 
-        # Future pathway: 200 inputs (50 × 4)
+        # Future pathway: large (no shift, reliable signal)
+        # 200 → 1024 → 512 → 256
         self.future_encoder = nn.Sequential(
-            nn.Linear(200, 512),
+            nn.Linear(200, 1024),
+            nn.GELU(),
+            nn.Linear(1024, 512),
             nn.GELU(),
             nn.Linear(512, 256),
             nn.GELU(),
         )
 
-        # Current state: 5 inputs
+        # Current state: small
+        # 5 → 64 → 64
         self.current_encoder = nn.Sequential(
             nn.Linear(5, 64),
+            nn.GELU(),
+            nn.Linear(64, 64),
             nn.GELU(),
         )
 
         # Head: 128 + 256 + 64 + 2 = 450
         self.head = nn.Sequential(
-            nn.Linear(450, 256),
+            nn.Linear(450, 512),
+            nn.GELU(),
+            nn.Linear(512, 512),
+            nn.GELU(),
+            nn.Linear(512, 256),
             nn.GELU(),
             nn.Linear(256, 1),
         )

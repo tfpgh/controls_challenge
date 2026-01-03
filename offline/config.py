@@ -61,7 +61,7 @@ class BCConfig:
     lr: float = 3e-4
     lr_min: float = 5e-6
     weight_decay: float = 1e-5
-    epochs: int = 100
+    epochs: int = 50
 
     # Evaluation
     eval_every_n_epochs: int = 25
