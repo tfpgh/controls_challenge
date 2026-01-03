@@ -28,7 +28,7 @@ def evaluate_online(model_path: Path, num_segments: int, config: BCConfig) -> fl
 
     run_fn = partial(_run_segment, model_path=str(model_path))
     costs = process_map(
-        run_fn, segment_paths, max_workers=15, chunksize=10, desc="Eval"
+        run_fn, segment_paths, max_workers=30, chunksize=10, desc="Eval"
     )
 
     return float(np.mean(costs))

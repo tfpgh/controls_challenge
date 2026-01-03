@@ -50,7 +50,7 @@ class BCConfig:
     control_start_idx: int = 100  # When control begins (from tinyphysics)
 
     # Noise
-    past_noise_std: float = 0.025
+    past_noise_std: float = 0.012
 
     # Model
     input_size: int = 247
@@ -59,12 +59,13 @@ class BCConfig:
     # Training
     batch_size: int = 8192
     lr: float = 3e-4
+    lr_min: float = 5e-6
     weight_decay: float = 1e-5
-    epochs: int = 50
+    epochs: int = 100
 
     # Evaluation
-    eval_every_n_epochs: int = 5
-    eval_num_segments: int = 500
+    eval_every_n_epochs: int = 25
+    eval_num_segments: int = 5000
 
     # Paths
     pgto_data_dir: str = "data/pgto/"

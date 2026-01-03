@@ -56,7 +56,7 @@ def train(config: BCConfig) -> None:
         weight_decay=config.weight_decay,
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=config.epochs, eta_min=1e-6
+        optimizer, T_max=config.epochs, eta_min=config.lr_min
     )
 
     # Loss function
