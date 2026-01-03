@@ -66,7 +66,10 @@ class BCModelAsymmetric(nn.Module):
 
     def __init__(self, config: BCConfig) -> None:
         super().__init__()
-        self.noise_std = 0.012
+
+        self.config = config
+
+        self.noise_std = self.config.past_noise_std
 
         # Past pathway: keep relatively small (shifts at eval)
         # 40 → 256 → 128 → 128
