@@ -101,7 +101,7 @@ def train(config: BCConfig) -> None:
             )
 
             # Save current model temporarily
-            temp_path = output_dir / "bc_temp.pt"
+            temp_path = output_dir / f"bc_temp_{os.getpid()}.pt"
             torch.save(model.state_dict(), temp_path)
 
             online_cost = evaluate_online(
