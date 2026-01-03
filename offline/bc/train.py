@@ -66,7 +66,7 @@ def train(config: BCConfig) -> None:
     best_online_cost = float("inf")
 
     for epoch in range(config.epochs):
-        model.noise_std = 0.020 - (0.015 * epoch / (config.epochs - 1))
+        model.noise_std = 0.023 - (0.021 * epoch / (config.epochs - 1))
 
         # Train
         model.train()
