@@ -1,3 +1,52 @@
+# controls_challenge
+
+Hi! This is my solution to the comma.ai Controls Challenge. The original README is below this explanation.
+
+Final Score: **43.776**
+
+I had basically zero prior experience in evolutionary algorithms, control theory, MPC, or behavioral cloning which meant I learned a ton but also, if you find yourself asking, “this is weird. why did he do it this way?”, it’s because I didn’t know there was a better way to do it.
+
+All the expensive work for this was done on Middlebury College’s (pretty small) HPC cluster.
+
+I converted the ONNX model to Torch which let me run parallelized physics inference on a GPU. I think this is probably slightly less performant than using the ONNX GPU runtime but it made the code a lot cleaner.
+
+The final solution is broken into 3 parts:
+
+### 1. The Prior: A Small MLP Evolved with CMA-ES
+My first attempt was a ~600 parameter MLP directly evolved with CMA-ES. The network takes in 14 derived features including PID, past lat accels, and summary statistics of the future and outputs a single action for this time step.
+
+I played around with having it output a delta on a baseline PID controller but it ended up being worse.
+
+This scored ~55 on the full 5k eval which isn’t competitive but was good enough to serve as a prior for the MPC in the next part.
+
+### 2. The Teacher: Expensive, Parallelized GPU Trajectory Optimization
+My next idea was to use the CMA-ES model as a baseline, but at each timestep try many slight variations on its proposed actions. I later learned that this is an established technique (a mix of ideas from MPC), but I didn’t know that when I started implementing it so in the code it's called policy-guided trajectory optimization or PGTO.
+
+At each timestep, we generate 128 candidate action trajectories. We take the CMA-ES prior suggested action and apply random noise to get 128 different actions, we then simulate a step forward with each action and repeat this 6 time steps into the future. We select the top 20% of trajectories (the elite fraction), adjust the noise distribution to be centered around them and iterate until the candidates converge. At that point we actually act on the best initial action found.
+
+The physics model provided returns a probability distribution over the lat accel tokens. Actual rollouts in tinyphysics sample this distribution (with temperature 0.8) to step forward. Initially I matched this behavior in PGTO when rolling forward candidate action trajectories, but very often an action sequence that is on average worse than another will  win out because it got a lucky rollout. The largest gain in the quality of PGTO output came from switching internal rollouts to the expected output of the physics model. This makes candidates directly comparable. Tiny changes in an action sequence have a tiny effect on the rollout rather than leading to a totally different stochastic outcome. The cost of a rollout of expected lat accels is not the same as the expected cost of a rollout of stochastic lat accels (which is the true metric we want to optimize), but it’s close enough in this case to work well.
+
+This whole process ends up being absurdly computationally expensive. The eval itself does 500 physics steps for each of the 5 thousand segments, so 2.5 million steps total. This takes about 10 minutes on my MacBook for the PID controller. This trajectory optimization does ~1k rollouts of 6 timesteps for every single real timestep forward. That’s 15 billion physics steps for 5k segments, so 41 days on my laptop. The control is expected to make a decision every tenth of a second and it takes us 1.5 seconds to make every decision. Not sure the math works out… I was hoping I could find some clever way to optimize this process and use it as an online controller, but it ended up just taking too long to get good results. Here, I came up with the final plan to instead generate these actions offline and use them to distill a student model.
+
+I did a final run, generating 10 different rollouts for all 5k segments. This took 3 days on 8 RTX workstation GPUs and the expected score—if this was used as a true controller—was 43.2. I now had 25 million really high quality state-action pairs (500 timesteps x 5k segments x 10 rollouts) to train the student on.
+
+### 3. The Student: Behavioral Cloning
+This final part ended up being easier than expected. It’s pretty much vanilla behavioral cloning with just a couple of additions.
+
+Training used all 25 million samples with MSE loss. I considered filtering out the worst scoring rollouts of each segment, but I found they were actually unlucky rollouts and not a failure of the trajectory optimization so they stayed in.
+
+My first attempt was a 3 million parameter vanilla MLP. The inputs are the current state, the past 20 actions and lat accels, the next 50 future states, the current relative position within a segment, and the validity of the past action buffer (when the control starts it’s all zeros). This worked, but costs were in the 60s due to distribution shift. I thought I was going to have to solve this with DAgger (requiring more expensive optimization), but it was pretty much eliminated with two small changes.
+
+The first was creating separate encoders for the past, future, and current state. These all feed into a shared head. Past actions suffer from distribution shift, so they’re not very reliable. We suggest this to the model by making the future encoder (~700k params) much larger than the past one (~50k params). This all can be represented in a vanilla MLP but the inductive bias was significantly better this way.
+
+The second change was adding noise to past action features during training. This also discourages the model from placing a lot of weight into past actions. Constant gaussian noise with a standard deviation of 0.012 worked exceptionally well to fix distribution shift. Noise annealing from 0.023 to 0.002 worked even better.
+
+Final training was 400 epochs with cosine LR annealing (3e-4 to 1e-6) and noise annealing (0.023 to 0.002). The end model was 1.5 million parameters and trained in 3.5 hours on one RTX 6000 Ada. Final training loss was 0.000026 (which is artificially raised by the 0.002 feature noise).
+
+Model inference for the full eval takes minutes. Much better than 41 days.
+
+---
+
 <div align="center">
 <h1>comma Controls Challenge v2</h1>
 
